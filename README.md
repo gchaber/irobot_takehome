@@ -12,11 +12,9 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-~~~
-Python 3 Installation required (python3 is the assumed executable name in the examples below)
-Doxygen required to generate HTML documentation of the code
-No other special dependencies are required
-~~~
+* Python 3 Installation required (python3 is the assumed executable name in the examples below)
+* Doxygen required to generate HTML documentation of the code
+* No other special dependencies are required
 
 ### Installing
 
