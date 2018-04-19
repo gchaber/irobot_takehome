@@ -39,6 +39,14 @@ python3 run_tests.py all
 
 TODO
 
+## Documentation (Doxygen)
+
+You can build the developer documentation by running:
+```
+doxygen doxygen.conf
+```
+in the root directory.
+
 ## Built With
 
 * [Adambom Dictionary](https://github.com/adambom/dictionary/) - The English dictionary used
