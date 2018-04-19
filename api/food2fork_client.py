@@ -1,4 +1,4 @@
-from rest_client import BasicRESTClient
+from api.rest_client import BasicRESTClient
 import json
 
 class Food2ForkClient(BasicRESTClient):
