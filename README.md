@@ -35,11 +35,12 @@ python3 takehome.py
 
 ## Unit Tests
 
-Below lists how you can test each component individually. To run all unit tests, you can execute the line below inside the root directory.
+To run all unit tests:
 ```
 cd <root directory>
 python3 run_tests.py all
 ```
+Below lists how you can test each component individually.
 
 ### API Tests
 
@@ -69,9 +70,10 @@ python3 run_tests.py user_interface
 
 You can build the developer documentation by running:
 ```
+cd <root directory>
 doxygen doxygen.conf
 ```
-in the root directory. The HTML documentation is generated with at the path: /docs/html
+The HTML documentation is generated with at the path: /docs/html
 
 ## Built With
 
