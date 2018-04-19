@@ -4,7 +4,7 @@ import difflib
 class EnglishDictionary:
     def __init__(self):
         self._eng_dict = None
-        with open('./adambom_dictionary/dictionary.json') as f:
+        with open('./dictionary.json') as f:
             self._eng_dict = json.load(f)
 
     def spell_check(self, word):
