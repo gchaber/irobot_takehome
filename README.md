@@ -8,7 +8,7 @@ This program does the following:
 ~~~
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development, testing, and running.
+These instructions will set up the project on your local machine for running, development and testing.
 
 ### Prerequisites
 
@@ -18,16 +18,16 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Installing
 
-First clone the repository
+First clone the repository:
 ```
 cd <install directory>
 git clone https://github.com/gchaber/irobot_takehome ./irobot_takehome
 ```
-No need to create a virtual environment since there are no special requirements
+There is no need to create a virtual environment since there are no special dependencies for this project.
 
 ### Running
 
-You can then start the application in the terminal
+To start the application, open the terminal and type:
 ```
 cd <root directory>
 python3 takehome.py
@@ -44,7 +44,7 @@ Below lists how you can test each component individually.
 
 ### API Tests
 
-To run the tests relating to the API
+To run the tests relating to the API:
 ```
 cd <root directory>
 python3 run_tests.py api
@@ -52,7 +52,7 @@ python3 run_tests.py api
 
 ### Spellcheck Tests
 
-To run the tests relating to the spell checker
+To run the tests relating to the spell checker:
 ```
 cd <root directory>
 python3 run_tests.py spellcheck
@@ -60,7 +60,7 @@ python3 run_tests.py spellcheck
 
 ### User Interface Tests
 
-To run the tests relating to the user interface/input flow
+To run the tests relating to the user interface/input flow:
 ```
 cd <root directory>
 python3 run_tests.py user_interface
@@ -73,7 +73,7 @@ You can build the developer documentation by running:
 cd <root directory>
 doxygen doxygen.conf
 ```
-The HTML documentation is generated with at the path: /docs/html
+You can find the generated HTML documentation at <root directory>/docs/html
 
 ## Built With
 
