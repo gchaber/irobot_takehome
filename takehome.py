@@ -18,6 +18,7 @@ class AppState(Enum):
     API_SEARCH_SORTING = 4
     API_SEARCH = 5
     API_GET_RECIPE = 6
+    DISPLAY_RESULTS = 7
 
 class TakeHomeApplication:
     """
@@ -39,6 +40,7 @@ class TakeHomeApplication:
         Constructor
 
         Initializes the Food2Fork client, spell check dictionary and state
+        Initial State: ENTER_INGREDIENT
         """
         self._food2fork_client = Food2ForkClient()
         self._spell_checker = EnglishDictionary()
@@ -51,6 +53,8 @@ class TakeHomeApplication:
         self._api_attempts = -1
         self._error_message = ''
         self._recipe_id = ''
+        self._recipe_title = ''
+        self._recipe_f2f_url = ''
 
     def _elaborate_possibilities(self, packed_suggestions, possibility=''):
         """
@@ -71,6 +75,20 @@ class TakeHomeApplication:
             possibility += ' '
         for suggestion in head_suggestions:
             self._elaborate_possibilities(packed_suggestions[1:], possibility + suggestion)
+
+    def _is_ingredient_in_curr(self, ingredient):
+        """
+        This function checks to see if the recipe's ingredient was one of the supplied ingredients
+        :param ingredient:
+            the recipe ingredient to check
+        :return:
+            True - is the ingredient
+            False - is not the ingredient
+        """
+        for curr_ingredient in self._curr_ingredients:
+            if ingredient.find(curr_ingredient) != -1:
+                return True
+        return False
 
     def _get_numeric_selection(self, max_sel):
         """
@@ -101,6 +119,18 @@ class TakeHomeApplication:
         """
         return input(prompt_text).split()
 
+    def _wait_api_attempts(self):
+        """
+        This function waits for RETRY_WAIT_TIMEOUT and then decrements the self._api_attempts variable
+        If it reaches 0, it transitions to the ERROR state.
+        Otherwise, it continues on in the current state.
+        """
+        time.sleep(TakeHomeApplication.RETRY_WAIT_TIMEOUT)
+        self._api_attempts -= 1
+        if self._api_attempts == 0:
+            self._error_message = 'Maximum API attempts exceeded'
+            self._state = AppState.ERROR
+
     def _process_state(self):
         """
         This function properly calls the correct state handler function.
@@ -110,10 +140,10 @@ class TakeHomeApplication:
             True - Application is finished
             False - Keep going
         """
-        if self._state == AppState.ERROR:
-            self._state_on_error()
-        elif self._state == AppState.FINISHED:
+        if self._state == AppState.FINISHED:
             return False
+        elif self._state == AppState.ERROR:
+            self._state_on_error()
         elif self._state == AppState.ENTER_INGREDIENT:
             self._state_enter_ingredient()
         elif self._state == AppState.SPELL_CHECK:
@@ -126,6 +156,8 @@ class TakeHomeApplication:
             self._state_api_search()
         elif self._state == AppState.API_GET_RECIPE:
             self._state_api_get_recipe()
+        elif self._state == AppState.DISPLAY_RESULTS:
+            self._state_display_results()
         return True
 
     def _state_enter_ingredient(self):
@@ -234,12 +266,9 @@ class TakeHomeApplication:
         comma_sep_list = comma_sep_list[:-1]
         resp_status, obj_data = self._food2fork_client.api_search(q=comma_sep_list, sort=self._sorting)
         if resp_status != 200 or obj_data is None:
-            print("API Search Failed, retrying in %s seconds" % (TakeHomeApplication.RETRY_WAIT_TIMEOUT))
-            time.sleep(TakeHomeApplication.RETRY_WAIT_TIMEOUT)
-            self._api_attempts -= 1
-            if self._api_attempts == 0:
-                self._error_message = 'Maximum API attempts exceeded'
-                self._state = AppState.ERROR
+            print("API Search Failed, status: %s, retrying in %s seconds" % (resp_status,
+                                                                             TakeHomeApplication.RETRY_WAIT_TIMEOUT))
+            self._wait_api_attempts()
             return
         if 'recipes' not in obj_data or len(obj_data['recipes']) == 0 or 'recipe_id' not in obj_data['recipes'][0]:
             self._error_message = 'No recipe returned, you must have had some interesting ingredients'
@@ -250,8 +279,59 @@ class TakeHomeApplication:
         self._state = AppState.API_GET_RECIPE
 
     def _state_api_get_recipe(self):
-        print("ingredients: %s" % (self._curr_ingredients,))
-        print("recipe_id: %s" % (self._recipe_id,))
+        """
+        API_GET_RECIPE state handler function
+
+        This state retrieves the full recipe from Food2Fork.
+        The purpose is to find the full list of ingredients and compare that against the supplied
+
+        It allows for MAX_API_ATTEMPTS if there's an error with the request, waits RETRY_WAIT_TIMEOUT between tries
+        Validates the response and if there is another error, it stops here and goes to the ERROR state
+        Otherwise, it transitions to the DISPLAY_RESULTS state
+        """
+        resp_status, obj_data = self._food2fork_client.api_get_recipe(self._recipe_id)
+        if resp_status != 200 or obj_data is None:
+            print("API Get Recipe Failed, status: %s, retrying in %s seconds" % (resp_status,
+                                                                                 TakeHomeApplication.RETRY_WAIT_TIMEOUT))
+            self._wait_api_attempts()
+            return
+        if 'recipe' not in obj_data or \
+           'ingredients' not in obj_data['recipe'] or \
+           'title' not in obj_data['recipe'] or \
+           'f2f_url' not in obj_data['recipe']:
+            self._error_message = "The recipe information did not get returned for some reason"
+            self._state = AppState.ERROR
+            return
+        self._recipe_ingredients = obj_data['recipe']['ingredients']
+        self._recipe_title = obj_data['recipe']['title']
+        self._recipe_f2f_url = obj_data['recipe']['f2f_url']
+        self._state = AppState.DISPLAY_RESULTS
+
+    def _state_display_results(self):
+        """
+        DISPLAY_RESULTS state handler function
+
+        Displays the ingredients that aren't in the supplied ingredients
+        Then, it transitions to the FINISHED state
+        """
+        print("Recipe Title: %s" % (self._recipe_title,))
+        print("Food2Fork URL: %s" % (self._recipe_f2f_url,))
+
+        print("Supplied ingredients:")
+        if len(self._curr_ingredients) == 0:
+            print("None")
+        else:
+            for ingredient in self._curr_ingredients:
+                print("%s" % (ingredient,))
+        print("")
+        print("Recipe ingredients that weren't supplied:")
+        at_least_one = False
+        for ingredient in self._recipe_ingredients:
+            if not self._is_ingredient_in_curr(ingredient):
+                at_least_one = True
+                print("%s" % (ingredient,))
+        if not at_least_one:
+            print("None")
         self._state = AppState.FINISHED
 
     def _state_on_error(self):
