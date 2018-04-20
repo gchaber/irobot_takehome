@@ -344,6 +344,11 @@ class TakeHomeApplication:
         self._state = AppState.FINISHED
 
     def main(self):
+        """
+        Entry point of application
+
+        The application will continue until self._process_state() returns False
+        """
         while self._process_state():
             pass
 

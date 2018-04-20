@@ -1,9 +1,25 @@
+"""@package run_tests
+This package includes the main entry point for the test suites
+"""
 import sys
 from tests.api import APITestSuite
 from tests.spellcheck import SpellCheckTestSuite
 from tests.user_interface import UserIntefaceTestSuite
 
 def main(args):
+    """
+    Main Entry point of unit tests
+    Usage: python3 run_tests.py <test>
+
+    :param args:
+        test
+
+    test:
+        all - all tests
+        api - api tests
+        spellcheck - spellcheck tests
+        user_interface - UI/State Machine tests
+    """
     if len(args) != 1:
         print("Invalid number of arguments")
         print("Usage: python3 run_tests.py <test>")
