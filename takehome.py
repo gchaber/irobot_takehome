@@ -1,13 +1,271 @@
+"""@package takehome
+This package contains the main application
+"""
 from api.food2fork_client import Food2ForkClient
 from spellcheck.english_dict import EnglishDictionary
+from enum import Enum
+import time
+
+class AppState(Enum):
+    """
+    All of the possible application states, details for each can be found in the TakeHomeApplication class documentation
+    """
+    ERROR = -1
+    FINISHED = 0
+    ENTER_INGREDIENT = 1
+    SPELL_CHECK = 2
+    SPELL_CHECK_SUGGESTIONS = 3
+    API_SEARCH_SORTING = 4
+    API_SEARCH = 5
+    API_GET_RECIPE = 6
 
 class TakeHomeApplication:
+    """
+    This class is responsible for implementing the main application/handling the user flow
+    """
+    MAX_API_ATTEMPTS = 4
+    RETRY_WAIT_TIMEOUT = 5
+
+    def app_state(self):
+        """
+        Accessor function for self._state
+        :return:
+            App state
+        """
+        return self._state
+
     def __init__(self):
+        """
+        Constructor
+
+        Initializes the Food2Fork client, spell check dictionary and state
+        """
         self._food2fork_client = Food2ForkClient()
         self._spell_checker = EnglishDictionary()
 
+        self._state = AppState.ENTER_INGREDIENT
+        self._curr_ingredients = []
+        self._spelling_suggestions = []
+        self._entered_ingredient = []
+        self._sorting = ''
+        self._api_attempts = -1
+        self._error_message = ''
+        self._recipe_id = ''
+
+    def _elaborate_possibilities(self, packed_suggestions, possibility=''):
+        """
+        This function will recursively create suggestions for the spelling of the entire ingredient based on the individual suggestions of each word.
+
+        PRECONDITION: self._spell_suggestions = [] (This function fills this array)
+
+        :param packed_suggestions:
+            The array of suggestions for the spelling of each word in the ingredient
+        :param possibility:
+            The current formed suggestion that, when complete, represents a suggestion of the spelling of the entire ingredient
+        """
+        if len(packed_suggestions) == 0:
+            self._spelling_suggestions.append(possibility)
+            return
+        head_suggestions = packed_suggestions[0]
+        if possibility != '':
+            possibility += ' '
+        for suggestion in head_suggestions:
+            self._elaborate_possibilities(packed_suggestions[1:], possibility + suggestion)
+
+    def _get_numeric_selection(self, max_sel):
+        """
+        This function get a numeric selection from the user.
+        The minimum choice is always 1.
+
+        :param max_sel:
+            The maximum choice number
+        :return:
+        """
+        sel = input("Enter selection: ")
+        if not sel.isdigit():
+            print("Invalid selection, must be a number")
+            return -1
+        sel = int(sel)
+        if sel < 1 or sel > max_sel:
+            print("Invalid selection, must be between 1 and %s" % (max_sel,))
+            return -1
+        return sel
+
+    def _split_input(self, prompt_text):
+        """
+        This function abstracts the input function and tokenizes the input into a list of words.
+        :param prompt_text:
+            The prompt given to the user
+        :return:
+            list representing the tokenized input
+        """
+        return input(prompt_text).split()
+
+    def _process_state(self):
+        """
+        This function properly calls the correct state handler function.
+        Descriptions for each state can be found in the handlers.
+
+        :return:
+            True - Application is finished
+            False - Keep going
+        """
+        if self._state == AppState.ERROR:
+            self._state_on_error()
+        elif self._state == AppState.FINISHED:
+            return False
+        elif self._state == AppState.ENTER_INGREDIENT:
+            self._state_enter_ingredient()
+        elif self._state == AppState.SPELL_CHECK:
+            self._state_spell_check()
+        elif self._state == AppState.SPELL_CHECK_SUGGESTIONS:
+            self._state_spell_check_suggestions()
+        elif self._state == AppState.API_SEARCH_SORTING:
+            self._state_api_search_sorting()
+        elif self._state == AppState.API_SEARCH:
+            self._state_api_search()
+        elif self._state == AppState.API_GET_RECIPE:
+            self._state_api_get_recipe()
+        return True
+
+    def _state_enter_ingredient(self):
+        """
+        ENTER_INGREDIENT state handler function
+
+        This state is responsible for getting an ingredient from the user.
+        It will properly validate the input, making sure that it is made up of words (isalpha)
+        If it fails validation, it will stay in this state until it doesn't
+
+        Next, it will transition to:
+            API_SEARCH_SORTING - if no input is entered
+            SPELL_CHECK - if valid input is entered
+        """
+        self._entered_ingredient = self._split_input("Enter single ingredient (leave blank if done): ")
+        if len(self._entered_ingredient) == 0:
+            self._state = AppState.API_SEARCH_SORTING
+            return
+        if False not in [x.isalpha() for x in self._entered_ingredient]:
+            self._state = AppState.SPELL_CHECK
+            return
+        print("Invalid input")
+
+    def _state_spell_check(self):
+        """
+        SPELL_CHECK state handler function
+
+        This state is responsible for checking the spelling of the ingredient.
+        It will check each word in the ingredient. If no words are misspelled, then it will:
+            1. Add the ingredient to the list
+            2. Return back to the ENTER_INGREDIENT state
+        If any word is possibly misspelled, it will form a list of possibilities given the list of suggestions for each misspelled word in the ingredient
+        It will then transition to the SPELL_CHECK_SUGGESTIONS state to allow the user to choose from this list
+        """
+        spelling_results = [self._spell_checker.spell_check(word) for word in self._entered_ingredient]
+        packed_suggestions = []
+        for (correct, word, suggestions) in spelling_results:
+            if correct:
+                packed_suggestions.append([word])
+            else:
+                packed_suggestions.append([word] + suggestions)
+        self._spelling_suggestions = []
+        self._elaborate_possibilities(packed_suggestions)
+        if len(self._spelling_suggestions) == 1:
+            self._curr_ingredients.append(self._spelling_suggestions[0])
+            self._state = AppState.ENTER_INGREDIENT
+            return
+        self._state = AppState.SPELL_CHECK_SUGGESTIONS
+
+    def _state_spell_check_suggestions(self):
+        """
+        SPELL_CHECK_SUGGESTIONS state handler function
+
+        After the list of suggestions is formed for the spelling of the entire ingredient, this state:
+            1. Prints them out, including a selection to reenter
+            2. Prompts user for input
+            3. Validates the input
+        If it fails to validate, it will stay in this state and make the user try again.
+        Otherwise, it will transition back to the ENTER_INGREDIENT state
+        """
+        print("Not sure if you spelled the ingredient correctly? Choose from below:")
+        i = 1
+        for suggestion in self._spelling_suggestions:
+            print("%s. %s" % (i, suggestion,))
+            i += 1
+        print("%s. Reenter ingredient" % (i,))
+        sel = self._get_numeric_selection(i)
+        if sel == -1:
+            return
+        if sel != i:
+            self._curr_ingredients.append(self._spelling_suggestions[sel-1])
+        self._state = AppState.ENTER_INGREDIENT
+
+    def _state_api_search_sorting(self):
+        """
+        API_SEARCH_SORTING state handler function
+
+        This state determines from user input what kind of sorting the user will like to base the recipe selection on
+        If validation succeeds, it transitions to the API_SEARCH state
+        Otherwise, it keeps asking until valid input is entered
+        """
+        print("Would you like to find the best recipe by:")
+        print("1. Rating")
+        print("2. Trendingness")
+        sel = self._get_numeric_selection(2)
+        if sel == 1:
+            self._sorting = 'r'
+        else:
+            self._sorting = 't'
+        self._state = AppState.API_SEARCH
+        self._api_attempts = TakeHomeApplication.MAX_API_ATTEMPTS
+
+    def _state_api_search(self):
+        """
+        API_SEARCH state handler function
+
+        This state queries Food2Fork for a recipe that contains the supplied ingredients
+        It allows for MAX_API_ATTEMPTS if there's an error with the request, waits RETRY_WAIT_TIMEOUT between tries
+        Validates the response, making sure there's a recipe
+        If there is no recipe or another error, it stops here and goes to the ERROR state
+        Otherwise, it grabs the top recipe's id and transitions to the API_GET_RECIPE state
+        """
+        comma_sep_list = ''
+        for ingredient in self._curr_ingredients:
+            comma_sep_list += ingredient + ','
+        comma_sep_list = comma_sep_list[:-1]
+        resp_status, obj_data = self._food2fork_client.api_search(q=comma_sep_list, sort=self._sorting)
+        if resp_status != 200 or obj_data is None:
+            print("API Search Failed, retrying in %s seconds" % (TakeHomeApplication.RETRY_WAIT_TIMEOUT))
+            time.sleep(TakeHomeApplication.RETRY_WAIT_TIMEOUT)
+            self._api_attempts -= 1
+            if self._api_attempts == 0:
+                self._error_message = 'Maximum API attempts exceeded'
+                self._state = AppState.ERROR
+            return
+        if 'recipes' not in obj_data or len(obj_data['recipes']) == 0 or 'recipe_id' not in obj_data['recipes'][0]:
+            self._error_message = 'No recipe returned, you must have had some interesting ingredients'
+            self._state = AppState.ERROR
+            return
+        self._recipe_id = obj_data['recipes'][0]['recipe_id']
+        self._api_attempts = TakeHomeApplication.MAX_API_ATTEMPTS
+        self._state = AppState.API_GET_RECIPE
+
+    def _state_api_get_recipe(self):
+        print("ingredients: %s" % (self._curr_ingredients,))
+        print("recipe_id: %s" % (self._recipe_id,))
+        self._state = AppState.FINISHED
+
+    def _state_on_error(self):
+        """
+        ERROR state handler function
+
+        Prints the error text and transitions to the FINISHED state
+        """
+        print("Error: %s" % (self._error_message,))
+        self._state = AppState.FINISHED
+
     def main(self):
-        print('hello, world')
+        while self._process_state():
+            pass
 
 if __name__ == '__main__':
     app = TakeHomeApplication()

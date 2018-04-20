@@ -30,10 +30,10 @@ class EnglishDictionary:
             The word to spell check. It is case insensitive
 
         :return:
-            Correct spelling - True, empty list
-            Incorrect spelling - False, list containing suggestions (lowercase).
+            Correct spelling - True, word, empty list
+            Incorrect spelling - False, word, list containing suggestions (lowercase).
         """
         if word.upper() in self._eng_dict:
-            return True, []
+            return True, word, []
         suggestions = [x.lower() for x in difflib.get_close_matches(word.upper(), self._eng_dict.keys())]
-        return False, suggestions
+        return False, word, suggestions
