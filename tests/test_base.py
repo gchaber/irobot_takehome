@@ -60,6 +60,7 @@ class TestSuite:
         """
         num_success = 0
         for test in cls.TESTS:
-            if test.run_test():
+            t = test()
+            if t.run_test():
                 num_success += 1
         return cls.TITLE, num_success, len(cls.TESTS)
