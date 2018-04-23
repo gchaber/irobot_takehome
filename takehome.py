@@ -6,19 +6,23 @@ from spellcheck.english_dict import EnglishDictionary
 from enum import Enum
 import time
 
-class AppState(Enum):
+class TakeHomeAppState(Enum):
     """
     All of the possible application states, details for each can be found in the TakeHomeApplication class documentation
     """
-    ERROR = -1
-    FINISHED = 0
-    ENTER_INGREDIENT = 1
-    SPELL_CHECK = 2
-    SPELL_CHECK_SUGGESTIONS = 3
-    API_SEARCH_SORTING = 4
-    API_SEARCH = 5
-    API_GET_RECIPE = 6
-    DISPLAY_RESULTS = 7
+    TEST_UNIMPLEMENTED = -1
+    ERROR = 0
+    FINISHED = 1
+    ENTER_INGREDIENT = 2
+    SPELL_CHECK = 3
+    SPELL_CHECK_SUGGESTIONS = 4
+    API_SEARCH_SORTING = 5
+    API_SEARCH = 6
+    API_GET_RECIPE = 7
+    DISPLAY_RESULTS = 8
+
+class UnknownTakeHomeAppStateException(Exception):
+    pass
 
 class TakeHomeApplication:
     """
@@ -45,7 +49,18 @@ class TakeHomeApplication:
         self._food2fork_client = Food2ForkClient()
         self._spell_checker = EnglishDictionary()
 
-        self._state = AppState.ENTER_INGREDIENT
+        self._state_func_map = {
+            TakeHomeAppState.ERROR:                     self._state_on_error,
+            TakeHomeAppState.ENTER_INGREDIENT:          self._state_enter_ingredient,
+            TakeHomeAppState.SPELL_CHECK:               self._state_spell_check,
+            TakeHomeAppState.SPELL_CHECK_SUGGESTIONS:   self._state_spell_check_suggestions,
+            TakeHomeAppState.API_SEARCH_SORTING:        self._state_api_search_sorting,
+            TakeHomeAppState.API_SEARCH:                self._state_api_search,
+            TakeHomeAppState.API_GET_RECIPE:            self._state_api_get_recipe,
+            TakeHomeAppState.DISPLAY_RESULTS:           self._state_display_results
+        }
+        self._state = TakeHomeAppState.ENTER_INGREDIENT
+
         self._curr_ingredients = []
         self._spelling_suggestions = []
         self._entered_ingredient = []
@@ -60,7 +75,7 @@ class TakeHomeApplication:
         """
         This function will recursively create suggestions for the spelling of the entire ingredient based on the individual suggestions of each word.
 
-        PRECONDITION: self._spell_suggestions = [] (This function fills this array)
+        PRECONDITION: self._spelling_suggestions = [] (This function fills this array)
 
         :param packed_suggestions:
             The array of suggestions for the spelling of each word in the ingredient
@@ -121,7 +136,7 @@ class TakeHomeApplication:
 
     def _wait_api_attempts(self):
         """
-        This function waits for RETRY_WAIT_TIMEOUT and then decrements the self._api_attempts variable
+        This function waits for RETRY_WAIT_TIMEOUT seconds and then decrements the self._api_attempts variable
         If it reaches 0, it transitions to the ERROR state.
         Otherwise, it continues on in the current state.
         """
@@ -129,7 +144,7 @@ class TakeHomeApplication:
         self._api_attempts -= 1
         if self._api_attempts == 0:
             self._error_message = 'Maximum API attempts exceeded'
-            self._state = AppState.ERROR
+            self._state = TakeHomeAppState.ERROR
 
     def _process_state(self):
         """
@@ -139,25 +154,16 @@ class TakeHomeApplication:
         :return:
             True - Application is finished
             False - Keep going
+
+            raises UnknownTakeHomeStateException if state is invalid or unimplemented
         """
-        if self._state == AppState.FINISHED:
+        if not isinstance(self._state, TakeHomeAppState):
+            raise UnknownTakeHomeAppStateException('Invalid State')
+        elif self._state == TakeHomeAppState.FINISHED:
             return False
-        elif self._state == AppState.ERROR:
-            self._state_on_error()
-        elif self._state == AppState.ENTER_INGREDIENT:
-            self._state_enter_ingredient()
-        elif self._state == AppState.SPELL_CHECK:
-            self._state_spell_check()
-        elif self._state == AppState.SPELL_CHECK_SUGGESTIONS:
-            self._state_spell_check_suggestions()
-        elif self._state == AppState.API_SEARCH_SORTING:
-            self._state_api_search_sorting()
-        elif self._state == AppState.API_SEARCH:
-            self._state_api_search()
-        elif self._state == AppState.API_GET_RECIPE:
-            self._state_api_get_recipe()
-        elif self._state == AppState.DISPLAY_RESULTS:
-            self._state_display_results()
+        elif self._state not in self._state_func_map:
+            raise UnknownTakeHomeAppStateException('Unimplemented State')
+        self._state_func_map[self._state]()
         return True
 
     def _state_enter_ingredient(self):
@@ -174,10 +180,10 @@ class TakeHomeApplication:
         """
         self._entered_ingredient = self._split_input("Enter single ingredient (leave blank if done): ")
         if len(self._entered_ingredient) == 0:
-            self._state = AppState.API_SEARCH_SORTING
+            self._state = TakeHomeAppState.API_SEARCH_SORTING
             return
         if False not in [x.isalpha() for x in self._entered_ingredient]:
-            self._state = AppState.SPELL_CHECK
+            self._state = TakeHomeAppState.SPELL_CHECK
             return
         print("Invalid input")
 
@@ -203,9 +209,9 @@ class TakeHomeApplication:
         self._elaborate_possibilities(packed_suggestions)
         if len(self._spelling_suggestions) == 1:
             self._curr_ingredients.append(self._spelling_suggestions[0])
-            self._state = AppState.ENTER_INGREDIENT
+            self._state = TakeHomeAppState.ENTER_INGREDIENT
             return
-        self._state = AppState.SPELL_CHECK_SUGGESTIONS
+        self._state = TakeHomeAppState.SPELL_CHECK_SUGGESTIONS
 
     def _state_spell_check_suggestions(self):
         """
@@ -229,7 +235,7 @@ class TakeHomeApplication:
             return
         if sel != i:
             self._curr_ingredients.append(self._spelling_suggestions[sel-1])
-        self._state = AppState.ENTER_INGREDIENT
+        self._state = TakeHomeAppState.ENTER_INGREDIENT
 
     def _state_api_search_sorting(self):
         """
@@ -247,7 +253,7 @@ class TakeHomeApplication:
             self._sorting = 'r'
         else:
             self._sorting = 't'
-        self._state = AppState.API_SEARCH
+        self._state = TakeHomeAppState.API_SEARCH
         self._api_attempts = TakeHomeApplication.MAX_API_ATTEMPTS
 
     def _state_api_search(self):
@@ -272,11 +278,11 @@ class TakeHomeApplication:
             return
         if 'recipes' not in obj_data or len(obj_data['recipes']) == 0 or 'recipe_id' not in obj_data['recipes'][0]:
             self._error_message = 'No recipe returned, you must have had some interesting ingredients'
-            self._state = AppState.ERROR
+            self._state = TakeHomeAppState.ERROR
             return
         self._recipe_id = obj_data['recipes'][0]['recipe_id']
         self._api_attempts = TakeHomeApplication.MAX_API_ATTEMPTS
-        self._state = AppState.API_GET_RECIPE
+        self._state = TakeHomeAppState.API_GET_RECIPE
 
     def _state_api_get_recipe(self):
         """
@@ -300,12 +306,12 @@ class TakeHomeApplication:
            'title' not in obj_data['recipe'] or \
            'f2f_url' not in obj_data['recipe']:
             self._error_message = "The recipe information did not get returned for some reason"
-            self._state = AppState.ERROR
+            self._state = TakeHomeAppState.ERROR
             return
         self._recipe_ingredients = obj_data['recipe']['ingredients']
         self._recipe_title = obj_data['recipe']['title']
         self._recipe_f2f_url = obj_data['recipe']['f2f_url']
-        self._state = AppState.DISPLAY_RESULTS
+        self._state = TakeHomeAppState.DISPLAY_RESULTS
 
     def _state_display_results(self):
         """
@@ -332,7 +338,7 @@ class TakeHomeApplication:
                 print("%s" % (ingredient,))
         if not at_least_one:
             print("None")
-        self._state = AppState.FINISHED
+        self._state = TakeHomeAppState.FINISHED
 
     def _state_on_error(self):
         """
@@ -341,7 +347,7 @@ class TakeHomeApplication:
         Prints the error text and transitions to the FINISHED state
         """
         print("Error: %s" % (self._error_message,))
-        self._state = AppState.FINISHED
+        self._state = TakeHomeAppState.FINISHED
 
     def main(self):
         """

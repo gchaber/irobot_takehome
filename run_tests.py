@@ -33,9 +33,9 @@ def main(args):
         results.append(SpellCheckTestSuite.run_suite())
     if test == 'user_interface' or test == 'all':
         results.append(UserIntefaceTestSuite.run_suite())
-    print("Test Report")
+    print("--- Test Report ---")
     for (suite_title, num_success, total_tests) in results:
-        print("%s: Pass/Total: %s/%s" % (suite_title, num_success, total_tests,))
+        print("%s - Passed: %s/%s" % (suite_title, num_success, total_tests,))
 
 if __name__ == '__main__':
     main(sys.argv[1:])

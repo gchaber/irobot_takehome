@@ -16,9 +16,9 @@ class BasicRestClientJSONDecodeTest(Test):
             return False
         if self._client._safe_json_decode('{test}') != (-1, None):
             return False
-        if self._client._safe_json_decode('') != (-1, None,):
+        if self._client._safe_json_decode('') != (-1, None):
             return False
-        if self._client._safe_json_decode('{"a": 1234}') != (200, {'a': 1234},):
+        if self._client._safe_json_decode('{"a": 1234}') != (200, {'a': 1234}):
             return False
         return True
 
