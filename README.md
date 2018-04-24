@@ -3,8 +3,8 @@
 This program does the following:
 ~~~
 1. The user enters a series of ingredients (It has a spell checker)
-2. The program will use Food2Fork to find the most popular recipe that contains most if not all of those ingredients
-3. Finally, the program will retrieve this recipe and print out any ingredients that weren't supplied
+2. The program will use Food2Fork to find the most popular recipe that contains those ingredients
+3. Finally, the program will retrieve this recipe and print out any ingredients that weren't supplied.
 ~~~
 ## Getting Started
 
