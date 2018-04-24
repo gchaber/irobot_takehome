@@ -1,4 +1,4 @@
-# IRobot Takehome
+# iRobot Takehome
 
 This program does the following:
 ~~~
