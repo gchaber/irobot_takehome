@@ -16,10 +16,9 @@ class TakeHomeAppState(Enum):
     ENTER_INGREDIENT = 2
     SPELL_CHECK = 3
     SPELL_CHECK_SUGGESTIONS = 4
-    API_SEARCH_SORTING = 5
-    API_SEARCH = 6
-    API_GET_RECIPE = 7
-    DISPLAY_RESULTS = 8
+    API_SEARCH = 5
+    API_GET_RECIPE = 6
+    DISPLAY_RESULTS = 7
 
 class UnknownTakeHomeAppStateException(Exception):
     pass
@@ -54,7 +53,6 @@ class TakeHomeApplication:
             TakeHomeAppState.ENTER_INGREDIENT:          self._state_enter_ingredient,
             TakeHomeAppState.SPELL_CHECK:               self._state_spell_check,
             TakeHomeAppState.SPELL_CHECK_SUGGESTIONS:   self._state_spell_check_suggestions,
-            TakeHomeAppState.API_SEARCH_SORTING:        self._state_api_search_sorting,
             TakeHomeAppState.API_SEARCH:                self._state_api_search,
             TakeHomeAppState.API_GET_RECIPE:            self._state_api_get_recipe,
             TakeHomeAppState.DISPLAY_RESULTS:           self._state_display_results
@@ -175,12 +173,14 @@ class TakeHomeApplication:
         If it fails validation, it will stay in this state until it doesn't
 
         Next, it will transition to:
-            API_SEARCH_SORTING - if no input is entered
+            API_SEARCH - if no input is entered
             SPELL_CHECK - if valid input is entered
         """
         self._entered_ingredient = self._split_input("Enter single ingredient (leave blank if done): ")
         if len(self._entered_ingredient) == 0:
-            self._state = TakeHomeAppState.API_SEARCH_SORTING
+            self._sorting = 'r' # Sort by rating
+            self._api_attempts = TakeHomeApplication.MAX_API_ATTEMPTS
+            self._state = TakeHomeAppState.API_SEARCH
             return
         if False not in [x.isalpha() for x in self._entered_ingredient]:
             self._state = TakeHomeAppState.SPELL_CHECK
@@ -236,25 +236,6 @@ class TakeHomeApplication:
         if sel != i:
             self._curr_ingredients.append(self._spelling_suggestions[sel-1])
         self._state = TakeHomeAppState.ENTER_INGREDIENT
-
-    def _state_api_search_sorting(self):
-        """
-        API_SEARCH_SORTING state handler function
-
-        This state determines from user input what kind of sorting the user will like to base the recipe selection on
-        If validation succeeds, it transitions to the API_SEARCH state
-        Otherwise, it keeps asking until valid input is entered
-        """
-        print("Would you like to find the best recipe by:")
-        print("1. Rating")
-        print("2. Trendingness")
-        sel = self._get_numeric_selection(2)
-        if sel == 1:
-            self._sorting = 'r'
-        else:
-            self._sorting = 't'
-        self._state = TakeHomeAppState.API_SEARCH
-        self._api_attempts = TakeHomeApplication.MAX_API_ATTEMPTS
 
     def _state_api_search(self):
         """
