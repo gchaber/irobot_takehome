@@ -99,7 +99,7 @@ class TakeHomeApplication:
             False - is not the ingredient
         """
         for curr_ingredient in self._curr_ingredients:
-            if ingredient.find(curr_ingredient) != -1:
+            if ingredient.lower().find(curr_ingredient.lower()) != -1:
                 return True
         return False
 
