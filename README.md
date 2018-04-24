@@ -25,6 +25,19 @@ git clone https://github.com/gchaber/irobot_takehome ./irobot_takehome
 ```
 There is no need to create a virtual environment since there are no special dependencies for this project.
 
+Create credentials.json file (using nano):
+```
+cd <root directory>
+nano credentials.json
+```
+Fill credentials.json with:
+```
+{
+    "food2fork_api_key": "<API KEY GOES HERE>"
+}
+```
+Save and exit. It should be ready to run now.
+
 ### Running
 
 To start the application, open the terminal and type:
